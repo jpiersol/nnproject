@@ -14,10 +14,18 @@
  *  Copyright 2009 UNM. All rights reserved.
  *
  */
-#include <algorithm>
-#include <iterator>
-#include <fstream>
-// #include "engine.h"
+
+float xn[1000][3];
+int xni=0;
+int in;
+
+float learn=0.01;
+float wn[4]={0,-0,0.-0};
+float error; 
+
+float sumerror=0;
+float rms;
+int nn=0;
 
 void agents_controller( WORLD_TYPE *w )
 { /* Adhoc function to test agents, to be replaced with NN controller. tpc */
@@ -40,7 +48,11 @@ void agents_controller( WORLD_TYPE *w )
   time_t now ;
   struct tm *date ;
   char timestamp[30] ;
-  float lifetimes[maxnlifetimes];
+
+
+  int mm;
+  int nm;
+  float tt;
   
   /* Initialize */
   forwardspeed = 0.05 ;  
@@ -50,64 +62,130 @@ void agents_controller( WORLD_TYPE *w )
 	   reset agent & world */
 	if( a->instate->metabolic_charge>0.0 )
 	{
-// 		/* get current motor rates and body/head angles */
-// 		read_actuators_agent( a, &dfb, &drl, &dth, &dh ) ;
-// 		read_agent_body_position( a, &bodyx, &bodyy, &bodyth ) ;
-// 		read_agent_head_angle( a, &headth ) ;
-// 				
+		/* get current motor rates and body/head angles */
+		read_actuators_agent( a, &dfb, &drl, &dth, &dh ) ;
+		read_agent_body_position( a, &bodyx, &bodyy, &bodyth ) ;
+		read_agent_head_angle( a, &headth ) ;
 
-        /* read somatic(touch) sensor for collision */  
+			
+		/* read somatic(touch) sensor for collision */  
 		collision_flag = read_soma_sensor(w, a) ; 	
     skinvalues = extract_soma_receptor_values_pointer( a ) ;
     nsomareceptors = get_number_of_soma_receptors( a ) ;
-    for( k=0 ; k<nsomareceptors ; k++ )
+   
+
+
+
+
+ for( k=0 ; k<nsomareceptors ; k++ )
     {
       if( (k==0 || k==1 || k==7 ) && skinvalues[k][0]>0.0 )
       {
         delta_energy = eat_colliding_object( w, a, k) ;
+       
+		if (delta_energy != 0){
+
+
+
+			/*srand(time(0));
+			for (in =1; in<xni-20; in++)
+			{
+				mm = rand() % 9;
+				nm = rand() % 9;
+
+				for (i = 0; i < 3; i++)
+				{
+					tt = xn[mm+in][i];
+				    xn[mm+in][i] = xn[nm+in][i];
+					xn[nm+in][i] = tt;
+				}*/
+
+			//shuffle
+
+
+			for (in =xni-1; in < xni; in++)
+
+			{
+				//printf("xn:%f %f %f,energy:%f\n", xn[in][0], xn[in][1], xn[in][2], delta_energy * 10);
+				tt = wn[0] * 1 + wn[1] * xn[in][0] + wn[2] * xn[in][1] + wn[3] * xn[in][2];
+				
+				
+				
+				error = delta_energy*10 - (wn[0] * 1 + wn[1] * xn[in][0] + wn[2] * xn[in][1] + wn[3] * xn[in][2]);
+				wn[0] = wn[0] + learn*error * 1;
+				wn[1] = wn[1] + learn*error*xn[in][0];
+				wn[2] = wn[2] + learn*error*xn[in][1];
+				wn[3] = wn[3] + learn*error*xn[in][2];
+
+				sumerror = sumerror + pow(error, 2);
+				nn++;
+			}
+
+		}
+
+	xni=0;
       }
     }
 
-//     
-//     /* read hearing sensors and load spectra for each ear, and compute integrated sound magnitudes */
-//     read_acoustic_sensor( w, a) ;
-//     ear0values = extract_sound_receptor_values_pointer( a, 0 ) ;
-//     ear1values = extract_sound_receptor_values_pointer( a, 1 ) ;
-//     nacousticfrequencies = get_number_of_acoustic_receptors( a ) ;    
-//     for( i=0 ; i<nacousticfrequencies ; i++ )
-//     {
-//       ear0mag += ear0values[i][0] ;
-//       ear1mag += ear1values[i][0] ;
-//     }
-//     //printf("simtime: %d ear0mag: %f ear1mag: %f\n",simtime,ear0mag,ear1mag) ;
-//     
-        
-// 		/* read visual sensor to get R, G, B intensity values */ 
-// 		read_visual_sensor( w, a) ;
-// 		eyevalues = extract_visual_receptor_values_pointer( a, 0 ) ;
 
-// 		
-//     /* find brights object in visual field */
-//     maxvisualreceptor = intensity_winner_takes_all( a ) ;
-// 		if( maxvisualreceptor >= 0 ) 
-// 		{
-// 			/* use brightest visual receptor to determine how to turn body to center it in the field of view */
-// 			maxvisualreceptordirection = visual_receptor_position( a->instate->eyes[0], maxvisualreceptor ) ;      
-// 			/* rotate body to face brightes object */
-// 			set_agent_body_angle( a, bodyth + maxvisualreceptordirection ) ;
-//     }
-//     else
-//     {
-//       printf("agents_controller-  No visible object, simtime: %d, changing direction.\n",simtime) ;
-//       read_agent_body_position( a, &bodyx, &bodyy, &bodyth ) ;
-//  			set_agent_body_angle( a, bodyth + 45.0 ) ;
-//     }
-// 
-//     /* move the agents body */
-        set_forward_speed_agent( a, forwardspeed ) ;
+
+
+
+    
+    /* read hearing sensors and load spectra for each ear, and compute integrated sound magnitudes */
+    read_acoustic_sensor( w, a) ;
+    ear0values = extract_sound_receptor_values_pointer( a, 0 ) ;
+    ear1values = extract_sound_receptor_values_pointer( a, 1 ) ;
+    nacousticfrequencies = get_number_of_acoustic_receptors( a ) ;    
+    for( i=0 ; i<nacousticfrequencies ; i++ )
+    {
+      ear0mag += ear0values[i][0] ;
+      ear1mag += ear1values[i][0] ;
+    }
+    //printf("simtime: %d ear0mag: %f ear1mag: %f\n",simtime,ear0mag,ear1mag) ;
+    
+
+
+
+
+
+
+		/* read visual sensor to get R, G, B intensity values */ 
+		read_visual_sensor( w, a) ;
+		eyevalues = extract_visual_receptor_values_pointer( a, 0 ) ;
+
+
+
+
+		
+    /* find brights object in visual field */
+    maxvisualreceptor = intensity_winner_takes_all( a ) ;
+		if( maxvisualreceptor >= 0 ) 
+		{
+			/* use brightest visual receptor to determine how to turn body to center it in the field of view */
+			maxvisualreceptordirection = visual_receptor_position( a->instate->eyes[0], maxvisualreceptor ) ;      
+			/* rotate body to face brightes object */
+			set_agent_body_angle( a, bodyth + maxvisualreceptordirection ) ;
+   
+  if(eyevalues[15][0]>0)
+		    {
+	              xn[xni][0]=eyevalues[15][0];
+                      xn[xni][1]=eyevalues[15][1];
+                      xn[xni][2]=eyevalues[15][2];
+		      xni++; }//record the eyevalue
+
+ }
+    else
+    {
+      // printf("agents_controller-  No visible object, simtime: %d, changing direction.\n",simtime) ;
+      read_agent_body_position( a, &bodyx, &bodyy, &bodyth ) ;
+ 			set_agent_body_angle( a, bodyth + 45.0 ) ;
+    }
+
+    /* move the agents body */
+    set_forward_speed_agent( a, forwardspeed ) ;
 		move_body_agent( a ) ;
-// 
-//         printf("Charge: %f",a->instate->metabolic_charge);
+
 		/* decrement metabolic charge by basil metabolism rate.  DO NOT REMOVE THIS CALL */
 		basal_metabolism_agent( a ) ;
 		simtime++ ;
@@ -117,12 +195,20 @@ void agents_controller( WORLD_TYPE *w )
 	{
     
     /* Example of agent is dead condition */
-// 		printf("agent_controller- Agent has died, eating %d objects. simtime: %d\n",a->instate->itemp[0], simtime ) ;
-// 		now = time(NULL) ;
-// 		date = localtime( &now ) ;
-// 		strftime(timestamp, 30, "%y/%m/%d H: %H M: %M S: %S",date) ;
-// 		printf("Death time: %s\n",timestamp) ;
+		printf("agent_controller- Agent has died, eating %d objects. simtime: %d\n",a->instate->itemp[0], simtime ) ;
+		now = time(NULL) ;
+		date = localtime( &now ) ;
+		strftime(timestamp, 30, "%y/%m/%d H: %H M: %M S: %S",date) ;
+		printf("Death time: %s\n",timestamp) ;
 		
+
+			rms = pow(sumerror / nn, 0.5);
+			printf("rms:%f output:%f times:%d w:%f %f %f %f \n", rms, tt, nn, wn[0], wn[1], wn[2], wn[3]);
+
+			sumerror = 0;
+			nn = 0;
+                        xni=0;
+
 		/* Example as to how to restore the world and agent after it dies. */
 		restore_objects_to_world( Flatworld ) ;  /* restore all of the objects back into the world */
 		reset_agent_charge( a ) ;               /* recharge the agent's battery to full */
@@ -130,23 +216,24 @@ void agents_controller( WORLD_TYPE *w )
 		x = distributions_uniform( Flatworld->xmin, Flatworld->xmax ) ; /* pick random starting position and heading */
 		y = distributions_uniform( Flatworld->ymin, Flatworld->ymax ) ;
 		h = distributions_uniform( -179.0, 179.0) ;
-// 		printf("\nagent_controller- new coordinates after restoration:  x: %f y: %f h: %f\n",x,y,h) ;
+		printf("\nagent_controller- new coordinates after restoration:  x: %f y: %f h: %f\n",x,y,h) ;
 		set_agent_body_position( a, x, y, h ) ;    /* set new position and heading of agent */
     
+
+		
+               
+
+
+
+
 		/* Accumulate lifetime statistices */
 		avelifetime += (float)simtime ;
-		lifetimes[nlifetimes] = (float)simtime;
 		simtime = 0 ;
-        nlifetimes++ ;
-        printf("Life: %i\n", nlifetimes);
-		if( nlifetimes >= maxnlifetimes )
+    nlifetimes++ ;
+		if( nlifetimes >= maxnlifetimes )//maxnlifetimes
 		{
 			avelifetime /= (float)maxnlifetimes ;
 			printf("\nAverage lifetime: %f\n",avelifetime) ;
-			std::ofstream out( "results.dat" );
-            out << "Lifetimes\n";
-    		std::copy( lifetimes, lifetimes + maxnlifetimes, std::ostream_iterator<float>( out, "\n" ) );
-            out.close();
 			exit(0) ;
 		}
 		

@@ -2088,8 +2088,8 @@ float eat_colliding_object( WORLD_TYPE *w, AGENT_TYPE *a, int j )
       agent_eat_object(  w, a, o ) ; /* eat the object */
       a->instate->itemp[0]++ ; /* increment the total number of objects eaten. this uses one of the user definable 
                                 temp variable in the agent data struct. */
-      printf("eat_colliding_object- Object: %3d of type: %1d eaten, food_value: %f. New charge: %5.4f total eaten: %1d simtime: %4d\n",
-             o->index,o->type,o->food_value,a->instate->metabolic_charge,a->instate->itemp[0],simtime) ;
+      // printf("eat_colliding_object- Object: %3d of type: %1d eaten, food_value: %f. New charge: %5.4f total eaten: %1d simtime: %4d\n",
+      // o->index,o->type,o->food_value,a->instate->metabolic_charge,a->instate->itemp[0],simtime) ;
       return( o->food_value ) ; /* assumes only one object is in collision with skin at one time */
     }	
   }
