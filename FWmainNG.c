@@ -25,7 +25,7 @@
 /* Global pointer to current Flatworld */
 WORLD_TYPE *Flatworld ;
 int simtime = 0 ;
-int nlifetimes = 0, maxnlifetimes = 20 ;
+int nlifetimes = 0, maxnlifetimes = 150 ;
 int runflag = 1 ;
 float avelifetime = 0.0 ;
 
@@ -84,7 +84,7 @@ int main(int argc, char** argv)
   strftime(timestamp, 30, "%y/%m/%d H: %H M: %M S: %S",date) ;
   printf("main- Start time: %s\n",timestamp) ;
 
-  for( t=0 ; t<100000 ; t++ )
+  for( t=0 ; t<1000000 ; t++ )
   {
     agents_controller( Flatworld ) ;
   }
