@@ -17,33 +17,41 @@
 #include <algorithm>
 #include <iterator>
 #include <fstream>
+#include <math.h>
 // #include "engine.h"
+
+float eyeval[3] = {0,0,0};
+float learn = 0.05;
+float weight[4] = { distributions_uniform( -1,1),distributions_uniform( -1,1),distributions_uniform( -1,1),distributions_uniform( -1,1) };
+float sumerror = 0;
+int num_eats = 0;
+float* rms_error = NULL;
+float* lifetimes = NULL;
 
 void agents_controller( WORLD_TYPE *w )
 { /* Adhoc function to test agents, to be replaced with NN controller. tpc */
 	
   AGENT_TYPE *a ;
-  int collision_flag=0 ;
-  int i,k ;
   int maxvisualreceptor = -1 ;
-  int nsomareceptors ;
   int nacousticfrequencies ;
-  float delta_energy ;
   float dfb , drl, dth, dh ;
   float headth ;
   float forwardspeed ;
   float maxvisualreceptordirection ;
   float bodyx, bodyy, bodyth ;
-  float x, y, h ;
   float **eyevalues, **ear0values, **ear1values, **skinvalues ;
   float ear0mag=0.0, ear1mag=0.0 ;
   time_t now ;
   struct tm *date ;
   char timestamp[30] ;
-  float lifetimes[maxnlifetimes];
   
-  /* Initialize */
-  forwardspeed = 0.05 ;  
+    if (rms_error == NULL)
+        rms_error = (float*)calloc(maxnlifetimes, sizeof(*rms_error));
+    if (lifetimes == NULL)
+        lifetimes = (float*)calloc(maxnlifetimes, sizeof(*lifetimes));
+
+    /* Initialize */
+    forwardspeed = 0.01 ;  
 	a = w->agents[0] ; /* get agent pointer */
 	
 	/* test if agent is alive. if so, process sensors and actuators.  if not, report death and 
@@ -57,16 +65,31 @@ void agents_controller( WORLD_TYPE *w )
 // 				
 
         /* read somatic(touch) sensor for collision */  
-		collision_flag = read_soma_sensor(w, a) ; 	
-    skinvalues = extract_soma_receptor_values_pointer( a ) ;
-    nsomareceptors = get_number_of_soma_receptors( a ) ;
-    for( k=0 ; k<nsomareceptors ; k++ )
-    {
-      if( (k==0 || k==1 || k==7 ) && skinvalues[k][0]>0.0 )
-      {
-        delta_energy = eat_colliding_object( w, a, k) ;
-      }
-    }
+		int collision_flag = read_soma_sensor(w, a) ; 	
+        skinvalues = extract_soma_receptor_values_pointer( a ) ;
+        int nsomareceptors = get_number_of_soma_receptors( a ) ;
+        for( int k=0 ; k<nsomareceptors ; k++ )
+        {
+          if( (k==0 || k==1 || k==7 ) && skinvalues[k][0]>0.0 )
+          {
+            float delta_energy = 10 * eat_colliding_object( w, a, k) ;
+//             if (delta_energy != 0) {
+                printf("Eyeval: %f, %f, %f\n", eyeval[0], eyeval[1], eyeval[2]);
+                float y = weight[0] + weight[1] * eyeval[0] + weight[2] * eyeval[1] + weight[3] * eyeval[2];
+
+                float error = delta_energy - y;
+                weight[0] += learn*error;
+                weight[1] += learn*error*eyeval[0];
+                weight[2] += learn*error*eyeval[1];
+                weight[3] += learn*error*eyeval[2];
+
+                sumerror += pow(error, 2);
+                rms_error[num_eats] = sqrt(sumerror/(num_eats+1));
+                num_eats++;
+                break;
+//             }
+          }
+        }
 
 //     
 //     /* read hearing sensors and load spectra for each ear, and compute integrated sound magnitudes */
@@ -74,7 +97,7 @@ void agents_controller( WORLD_TYPE *w )
 //     ear0values = extract_sound_receptor_values_pointer( a, 0 ) ;
 //     ear1values = extract_sound_receptor_values_pointer( a, 1 ) ;
 //     nacousticfrequencies = get_number_of_acoustic_receptors( a ) ;    
-//     for( i=0 ; i<nacousticfrequencies ; i++ )
+//     for( int i=0 ; i<nacousticfrequencies ; i++ )
 //     {
 //       ear0mag += ear0values[i][0] ;
 //       ear1mag += ear1values[i][0] ;
@@ -82,9 +105,15 @@ void agents_controller( WORLD_TYPE *w )
 //     //printf("simtime: %d ear0mag: %f ear1mag: %f\n",simtime,ear0mag,ear1mag) ;
 //     
         
-// 		/* read visual sensor to get R, G, B intensity values */ 
-// 		read_visual_sensor( w, a) ;
-// 		eyevalues = extract_visual_receptor_values_pointer( a, 0 ) ;
+		/* read visual sensor to get R, G, B intensity values */ 
+		read_visual_sensor( w, a) ;
+		eyevalues = extract_visual_receptor_values_pointer( a, 0 ) ;
+        
+        //record the eyevalue
+        eyeval[0] = eyevalues[15][0];
+        eyeval[1] = eyevalues[15][1];
+        eyeval[2] = eyevalues[15][2];
+        
 
 // 		
 //     /* find brights object in visual field */
@@ -115,6 +144,7 @@ void agents_controller( WORLD_TYPE *w )
 	} /* end agent alive condition */
 	else
 	{
+        float x0, y0, h0 ;
     
     /* Example of agent is dead condition */
 // 		printf("agent_controller- Agent has died, eating %d objects. simtime: %d\n",a->instate->itemp[0], simtime ) ;
@@ -127,11 +157,11 @@ void agents_controller( WORLD_TYPE *w )
 		restore_objects_to_world( Flatworld ) ;  /* restore all of the objects back into the world */
 		reset_agent_charge( a ) ;               /* recharge the agent's battery to full */
 		a->instate->itemp[0] = 0 ;              /* zero the number of object's eaten accumulator */
-		x = distributions_uniform( Flatworld->xmin, Flatworld->xmax ) ; /* pick random starting position and heading */
-		y = distributions_uniform( Flatworld->ymin, Flatworld->ymax ) ;
-		h = distributions_uniform( -179.0, 179.0) ;
-// 		printf("\nagent_controller- new coordinates after restoration:  x: %f y: %f h: %f\n",x,y,h) ;
-		set_agent_body_position( a, x, y, h ) ;    /* set new position and heading of agent */
+		x0 = distributions_uniform( Flatworld->xmin, Flatworld->xmax ) ; /* pick random starting position and heading */
+		y0 = distributions_uniform( Flatworld->ymin, Flatworld->ymax ) ;
+		h0 = distributions_uniform( -179.0, 179.0) ;
+// 		printf("\nagent_controller- new coordinates after restoration:  x: %f y: %f h: %f\n",x0,y0,h0) ;
+		set_agent_body_position( a, x0, y0, h0 ) ;    /* set new position and heading of agent */
     
 		/* Accumulate lifetime statistices */
 		avelifetime += (float)simtime ;
@@ -143,10 +173,17 @@ void agents_controller( WORLD_TYPE *w )
 		{
 			avelifetime /= (float)maxnlifetimes ;
 			printf("\nAverage lifetime: %f\n",avelifetime) ;
+            
 			std::ofstream out( "results.dat" );
             out << "Lifetimes\n";
     		std::copy( lifetimes, lifetimes + maxnlifetimes, std::ostream_iterator<float>( out, "\n" ) );
             out.close();
+            
+			std::ofstream rmsout( "rms_error.dat" );
+            rmsout << "RMS Error\n";
+    		std::copy( rms_error, rms_error + maxnlifetimes, std::ostream_iterator<float>( rmsout, "\n" ) );
+            rmsout.close();
+            
 			exit(0) ;
 		}
 		
