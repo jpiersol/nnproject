@@ -25,7 +25,7 @@
 /* Global pointer to current Flatworld */
 WORLD_TYPE *Flatworld ;
 int simtime = 0 ;
-int nlifetimes = 0, maxnlifetimes = 200 ;
+int nlifetimes = 0, maxnlifetimes = 100 ;
 int runflag = 1 ;
 float avelifetime = 0.0 ;
 

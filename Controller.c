@@ -72,10 +72,11 @@ void agents_controller( WORLD_TYPE *w )
         {
           if( (k==0 || k==1 || k==7 ) && skinvalues[k][0]>0.0 )
           {
-            float delta_energy = 10 * eat_colliding_object( w, a, k) ;
-//             if (delta_energy != 0) {
-                printf("Eyeval: %f, %f, %f\n", eyeval[0], eyeval[1], eyeval[2]);
-                float y = weight[0] + weight[1] * eyeval[0] + weight[2] * eyeval[1] + weight[3] * eyeval[2];
+            float y = weight[0] + weight[1] * eyeval[0] + weight[2] * eyeval[1] + weight[3] * eyeval[2];
+            if (y > 0) {
+                float delta_energy = 10 * eat_colliding_object( w, a, k) ;
+//              if (delta_energy != 0) {
+//                  printf("Eyeval: %f, %f, %f\n", eyeval[0], eyeval[1], eyeval[2]);
 
                 float error = delta_energy - y;
                 weight[0] += learn*error;
@@ -88,6 +89,7 @@ void agents_controller( WORLD_TYPE *w )
                 num_eats++;
                 break;
 //             }
+            }
           }
         }
 
@@ -174,15 +176,20 @@ void agents_controller( WORLD_TYPE *w )
 			avelifetime /= (float)maxnlifetimes ;
 			printf("\nAverage lifetime: %f\n",avelifetime) ;
             
-			std::ofstream out( "results.dat" );
+			std::ofstream out( "results.csv" );
             out << "Lifetimes\n";
     		std::copy( lifetimes, lifetimes + maxnlifetimes, std::ostream_iterator<float>( out, "\n" ) );
             out.close();
             
-			std::ofstream rmsout( "rms_error.dat" );
+			std::ofstream rmsout( "rms_error.csv" );
             rmsout << "RMS Error\n";
     		std::copy( rms_error, rms_error + maxnlifetimes, std::ostream_iterator<float>( rmsout, "\n" ) );
             rmsout.close();
+            
+            std::ofstream wout( "weights.csv" );
+            wout << "Weights\n";
+            std::copy( weight, weight + 4, std::ostream_iterator<float>( wout, "\n" ) );
+            wout.close();
             
 			exit(0) ;
 		}
