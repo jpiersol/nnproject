@@ -20,13 +20,15 @@
 #include <math.h>
 // #include "engine.h"
 
+using namespace std;
+
 float eyeval[3] = {0,0,0};
 float learn = 0.05;
 float weight[4] = { distributions_uniform( -1,1),distributions_uniform( -1,1),distributions_uniform( -1,1),distributions_uniform( -1,1) };
 float sumerror = 0;
 int num_eats = 0;
-float* rms_error = NULL;
-float* lifetimes = NULL;
+ofstream* results = NULL;
+ofstream* rms_error = NULL;
 
 void agents_controller( WORLD_TYPE *w )
 { /* Adhoc function to test agents, to be replaced with NN controller. tpc */
@@ -45,10 +47,14 @@ void agents_controller( WORLD_TYPE *w )
   struct tm *date ;
   char timestamp[30] ;
   
-    if (rms_error == NULL)
-        rms_error = (float*)calloc(maxnlifetimes, sizeof(*rms_error));
-    if (lifetimes == NULL)
-        lifetimes = (float*)calloc(maxnlifetimes, sizeof(*lifetimes));
+    if (results == NULL) {
+        results = new ofstream( "results.csv" );
+        *results << "Lifetimes" << endl;
+    }
+    if (rms_error == NULL) {
+        rms_error = new ofstream( "rms_error.csv" );
+        *rms_error << "RMS Error" << endl;
+    }
 
     /* Initialize */
     forwardspeed = 0.01 ;  
@@ -58,11 +64,22 @@ void agents_controller( WORLD_TYPE *w )
 	   reset agent & world */
 	if( a->instate->metabolic_charge>0.0 )
 	{
-// 		/* get current motor rates and body/head angles */
-// 		read_actuators_agent( a, &dfb, &drl, &dth, &dh ) ;
-// 		read_agent_body_position( a, &bodyx, &bodyy, &bodyth ) ;
-// 		read_agent_head_angle( a, &headth ) ;
-// 				
+		/* get current motor rates and body/head angles */
+		read_actuators_agent( a, &dfb, &drl, &dth, &dh ) ;
+		read_agent_body_position( a, &bodyx, &bodyy, &bodyth ) ;
+		read_agent_head_angle( a, &headth ) ;
+        
+		/* read visual sensor to get R, G, B intensity values */ 
+		read_visual_sensor( w, a) ;
+		eyevalues = extract_visual_receptor_values_pointer( a, 0 ) ;
+        
+        //record the eyevalue
+        float sumeyeval = eyevalues[15][0] + eyevalues[15][1] + eyevalues[15][2];
+        if (sumeyeval == 0) sumeyeval = 0.000001;
+        eyeval[0] = eyevalues[15][0] / sumeyeval;
+        eyeval[1] = eyevalues[15][1] / sumeyeval;
+        eyeval[2] = eyevalues[15][2] / sumeyeval;
+				
 
         /* read somatic(touch) sensor for collision */  
 		int collision_flag = read_soma_sensor(w, a) ; 	
@@ -73,7 +90,7 @@ void agents_controller( WORLD_TYPE *w )
           if( (k==0 || k==1 || k==7 ) && skinvalues[k][0]>0.0 )
           {
             float y = weight[0] + weight[1] * eyeval[0] + weight[2] * eyeval[1] + weight[3] * eyeval[2];
-            if (y > 0) {
+//             if (y > 0) {
                 float delta_energy = 10 * eat_colliding_object( w, a, k) ;
 //              if (delta_energy != 0) {
 //                  printf("Eyeval: %f, %f, %f\n", eyeval[0], eyeval[1], eyeval[2]);
@@ -85,11 +102,11 @@ void agents_controller( WORLD_TYPE *w )
                 weight[3] += learn*error*eyeval[2];
 
                 sumerror += pow(error, 2);
-                rms_error[num_eats] = sqrt(sumerror/(num_eats+1));
+                *rms_error << sqrt(sumerror/(num_eats+1)) << endl;
                 num_eats++;
                 break;
 //             }
-            }
+//             }
           }
         }
 
@@ -107,34 +124,26 @@ void agents_controller( WORLD_TYPE *w )
 //     //printf("simtime: %d ear0mag: %f ear1mag: %f\n",simtime,ear0mag,ear1mag) ;
 //     
         
-		/* read visual sensor to get R, G, B intensity values */ 
-		read_visual_sensor( w, a) ;
-		eyevalues = extract_visual_receptor_values_pointer( a, 0 ) ;
-        
-        //record the eyevalue
-        eyeval[0] = eyevalues[15][0];
-        eyeval[1] = eyevalues[15][1];
-        eyeval[2] = eyevalues[15][2];
         
 
-// 		
-//     /* find brights object in visual field */
-//     maxvisualreceptor = intensity_winner_takes_all( a ) ;
-// 		if( maxvisualreceptor >= 0 ) 
-// 		{
-// 			/* use brightest visual receptor to determine how to turn body to center it in the field of view */
-// 			maxvisualreceptordirection = visual_receptor_position( a->instate->eyes[0], maxvisualreceptor ) ;      
-// 			/* rotate body to face brightes object */
-// 			set_agent_body_angle( a, bodyth + maxvisualreceptordirection ) ;
-//     }
-//     else
-//     {
-//       printf("agents_controller-  No visible object, simtime: %d, changing direction.\n",simtime) ;
-//       read_agent_body_position( a, &bodyx, &bodyy, &bodyth ) ;
-//  			set_agent_body_angle( a, bodyth + 45.0 ) ;
-//     }
-// 
-//     /* move the agents body */
+		
+        /* find brights object in visual field */
+        maxvisualreceptor = intensity_winner_takes_all( a ) ;
+        if( maxvisualreceptor >= 0 ) 
+            {
+                /* use brightest visual receptor to determine how to turn body to center it in the field of view */
+                maxvisualreceptordirection = visual_receptor_position( a->instate->eyes[0], maxvisualreceptor ) ;      
+                /* rotate body to face brightes object */
+                set_agent_body_angle( a, bodyth + maxvisualreceptordirection ) ;
+        }
+        else
+        {
+          printf("agents_controller-  No visible object, simtime: %d, changing direction.\n",simtime) ;
+          read_agent_body_position( a, &bodyx, &bodyy, &bodyth ) ;
+                set_agent_body_angle( a, bodyth + 45.0 ) ;
+        }
+
+        /* move the agents body */
         set_forward_speed_agent( a, forwardspeed ) ;
 		move_body_agent( a ) ;
 // 
@@ -167,7 +176,9 @@ void agents_controller( WORLD_TYPE *w )
     
 		/* Accumulate lifetime statistices */
 		avelifetime += (float)simtime ;
-		lifetimes[nlifetimes] = (float)simtime;
+		*results << simtime;
+        printf("Weights: %f %f %f %f\n", weight[0], weight[1], weight[2], weight[3]);
+        
 		simtime = 0 ;
         nlifetimes++ ;
         printf("Life: %i\n", nlifetimes);
@@ -176,19 +187,12 @@ void agents_controller( WORLD_TYPE *w )
 			avelifetime /= (float)maxnlifetimes ;
 			printf("\nAverage lifetime: %f\n",avelifetime) ;
             
-			std::ofstream out( "results.csv" );
-            out << "Lifetimes\n";
-    		std::copy( lifetimes, lifetimes + maxnlifetimes, std::ostream_iterator<float>( out, "\n" ) );
-            out.close();
-            
-			std::ofstream rmsout( "rms_error.csv" );
-            rmsout << "RMS Error\n";
-    		std::copy( rms_error, rms_error + maxnlifetimes, std::ostream_iterator<float>( rmsout, "\n" ) );
-            rmsout.close();
-            
-            std::ofstream wout( "weights.csv" );
+            results->close();
+            rms_error->close();
+                        
+            ofstream wout( "weights.csv" );
             wout << "Weights\n";
-            std::copy( weight, weight + 4, std::ostream_iterator<float>( wout, "\n" ) );
+            copy( weight, weight + 4, ostream_iterator<float>( wout, "\n" ) );
             wout.close();
             
 			exit(0) ;
